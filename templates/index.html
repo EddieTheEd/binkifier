@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Binkifier</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+            width: 90%;
+            cursor: pointer;
+        }
+        #preview {
+            max-width: 100%;
+            margin-top: 20px;
+        }
+        .hidden {
+            display: none;
+        }
+        .instructions {
+            text-align: center;
+            margin-top: 10px;
+            color: #666;
+            font-style: italic;
+        }
+        #result-container {
+            margin-top: 20px;
+            text-align: center;
+        }
+        #result-image {
+            max-width: 100%;
+            margin-top: 20px;
+        }
+        #status-message {
+            margin-top: 15px;
+            font-weight: bold;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: red;
+        }
+        .processing {
+            color: #ff9900;
+        }
+    </style>
+</head>
+<body>
+    <h1>Binkifier</h1>
+    
+    <div class="container">
+        <div class="upload-area" id="upload-area">
+            <p>Paste an image or drag and drop it here</p>
+            <p class="instructions">Once an image is added, it will automatically be processed and copied to your clipboard</p>
+            <input type="file" id="file-input" accept="image/*" class="hidden">
+        </div>
+        
+        <div id="result-container">
+            <div id="preview-container">
+                <img id="preview" class="hidden">
+            </div>
+            <div id="result-preview-container">
+                <img id="result-image" class="hidden">
+            </div>
+            <p id="status-message"></p>
+        </div>
+    </div>
+    
+    <script>
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-input');
+        const preview = document.getElementById('preview');
+        const resultContainer = document.getElementById('result-container');
+        const resultImage = document.getElementById('result-image');
+        const statusMessage = document.getElementById('status-message');
+        
+        let processingImage = false;
+        
+        // Click on upload area to trigger file input
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        // Handle drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#4CAF50';
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.style.borderColor = '#ccc';
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#ccc';
+            
+            if (e.dataTransfer.files.length) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        
+        // Handle file selection
+        fileInput.addEventListener('change', (e) => {
+            if (fileInput.files.length) {
+                handleFile(fileInput.files[0]);
+            }
+        });
+        
+        // Handle clipboard paste (Ctrl+V)
+        document.addEventListener('paste', (e) => {
+            e.preventDefault();
+            
+            // Get clipboard items
+            const items = (e.clipboardData || window.clipboardData).items;
+            
+            for (let i = 0; i < items.length; i++) {
+                // Check if the item is an image
+                if (items[i].type.indexOf('image') !== -1) {
+                    // Get the blob from clipboard
+                    const blob = items[i].getAsFile();
+                    handleFile(blob);
+                    break;
+                }
+            }
+        });
+        
+        function handleFile(file) {
+            if (!file || !file.type.match('image.*')) {
+                alert('Please select an image file');
+                return;
+            }
+            
+            if (processingImage) {
+                return; // Prevent multiple simultaneous uploads
+            }
+            
+            processingImage = true;
+            statusMessage.textContent = 'Processing image...';
+            statusMessage.className = 'processing';
+            
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                preview.src = e.target.result;
+                preview.classList.remove('hidden');
+                
+                // Automatically process the image
+                processImage(e.target.result);
+            };
+            
+            reader.readAsDataURL(file);
+        }
+        
+        function processImage(imageData) {
+            // Send the image data to the server
+            fetch('/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'image_data=' + encodeURIComponent(imageData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Display the result image
+                resultImage.src = data.image;
+                resultImage.classList.remove('hidden');
+                
+                // Copy the image to clipboard
+                copyImageToClipboard(data.image);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                statusMessage.textContent = 'Error processing image';
+                statusMessage.className = 'error';
+                processingImage = false;
+            });
+        }
+        
+        // Function to copy image to clipboard
+        async function copyImageToClipboard(dataUrl) {
+            try {
+                // Fetch the image as a blob
+                const response = await fetch(dataUrl);
+                const blob = await response.blob();
+                
+                // Create a ClipboardItem
+                const item = new ClipboardItem({ 'image/png': blob });
+                
+                // Copy to clipboard
+                await navigator.clipboard.write([item]);
+                
+                statusMessage.textContent = 'Image copied to clipboard!';
+                statusMessage.className = 'success';
+            } catch (error) {
+                console.error('Failed to copy image:', error);
+                statusMessage.textContent = 'Failed to copy to clipboard. You may need to use a browser that supports clipboard API like Chrome.';
+                statusMessage.className = 'error';
+            } finally {
+                processingImage = false;
+            }
+        }
+    </script>
+</body>
+</html>
