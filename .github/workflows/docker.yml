@@ -21,8 +21,8 @@ jobs:
         id: build-docker-image
         run: |
           ls -la
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/cooking:latest .
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/binkifier:latest .
 
       - name: Push the Docker image
         id: push-docker-image
-        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/cooking:latest
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/binkifier:latest
